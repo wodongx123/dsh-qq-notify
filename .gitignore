@@ -1,0 +1,28 @@
+# ===== NapCat 部署（含 node.exe / wrapper.node / DLL 等大二进制，不入库）=====
+napcat/
+
+# ===== 运行时生成物 =====
+*.log
+.napcat.pid
+.napcat-launch.vbs
+run-stdout.log
+run-stderr.log
+
+# ===== 个人配置（含主号 QQ；入库请用 qq-notify.config.example.json 模板）=====
+qq-notify.config.json
+
+# ===== 凭据（绝不可入库）=====
+.github-token
+*.pem
+*.key
+
+# ===== LLBot 遗留方案 =====
+llbot/
+llbot-download.zip
+napcat-download.zip
+start-llbot.ps1
+
+# ===== 系统 =====
+Thumbs.db
+.DS_Store
+desktop.ini
