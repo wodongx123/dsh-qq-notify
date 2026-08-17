@@ -1,70 +1,67 @@
-# QQ 任务通知 / 远控通道（DSH 平台）
+# QQ 任务通知 / 远控通道（DSH）
 
-在 DSH 平台上实现"耗时任务完成 → QQ 主动通知"（可选扩展：QQ 远控本机）。
+在 DeepSeek Harness（DSH）上实现：**耗时任务完成 → QQ 主动通知你**。底层用本机 NapCat 机器人（非官方协议，小号承担风险，主号零风险）。
 
-> 📄 **完整部署文档见 [`DEPLOY.md`](DEPLOY.md)** —— 包含 NapCat 部署、两个必要修复、登录流程、通知/远控两种模式、安全清单与故障排查，可直接在另一台设备照做。
+## 快速开始（只需 3 步）
 
-## 快速入口
+1. **确认 NapCat 在运行**：命令行执行 `qq status`，显示"HTTP API 3002 监听中"即可；没运行就 `qq start`
+2. **重启 DSH**（让插件加载，只需要做一次）
+3. 之后任选一种方式发通知 👇
 
-| 文件 | 用途 |
+## 怎么用
+
+### 方式一：网页控制台（最直观）
+
+浏览器打开 **http://127.0.0.1:3003**（QQ 通知控制台）：
+
+- 上方：通道状态（NapCat 在线/离线、机器人号）
+- 中间：输入消息 → 点「发送」
+- 下方：NapCat 启动 / 停止 / 重启 按钮
+
+### 方式二：直接对话（和 Qclaw 一样）
+
+重启 DSH 后，在任意会话里直接说：
+
+| 你说 | 效果 |
 |---|---|
-| `DEPLOY.md` | 部署与使用文档（从零开始） |
-| `qq.cmd` | **一键命令入口**（双击/命令行均可，见下方用法） |
-| `qq.ps1` | `qq.cmd` 的 PowerShell 实现（发消息/启停/自检/自启） |
-| `qq-notify.ps1` | 底层通知脚本（`qq.cmd send` 内部调用） |
-| `qq-remote-plugin.js` | DSH 桥接插件代码存档（远控模式） |
-| `mock-client.mjs` | 无 QQ 时链路自测 |
-| `start-napcat.ps1` | NapCat 启动脚本（开机自启也用它） |
-| `napcat/` | NapCat 部署目录 |
+| `用QQ发：任务完成了` | 发送到主号 940841288 |
+| `发QQ消息：构建成功` / `QQ通知我：...` | 同上 |
+| `查一下QQ通道状态` | 返回 NapCat 是否在线、机器人号 |
+| `启动QQ通知` / `重启NapCat` | 后台启停 NapCat |
+| `帮我装好QQ通知` | 自动下载部署 NapCat 并引导扫码 |
 
-## 日常使用（封装后的傻瓜用法）
+### 方式三：命令行 / 脚本
 
-**发通知**（最常用）：
 ```bat
-qq send "备份完成，耗时 12 分钟"
-```
-或者**直接双击 `qq.cmd`** → 输入消息 → 回车即发送。
-
-**管理 NapCat**（`qq.cmd` 需在 PATH 中，或到 `D:\Project\qq-remote-deploy` 目录执行）：
-```bat
-qq start        :: 后台启动 NapCat（窗口完全隐藏、无任务栏图标，自动快速登录）
-qq stop         :: 停止 NapCat
-qq status       :: 健康检查（端口/登录账号/自启状态）
-qq logs         :: 查看 NapCat 日志（隐藏窗口后用它排查）
-qq autostart on :: 开机自启（隐藏窗口，NapCat 随 Windows 启动，通知通道常在线）
-qq install      :: 把本目录加入 PATH（新开终端后任意目录可用 qq 命令）
+qq send "备份完成，耗时 12 分钟"   :: 发通知（默认发到主号）
+qq status                          :: 查状态
+qq start / qq stop / qq logs       :: 启停 NapCat、看日志
+qq autostart on                    :: 开机自启（隐藏窗口）
 ```
 
-**双击发送（全程无窗口）**：双击 `qq.vbs` → 弹输入框 → 输入消息回车 → 自动隐藏发送并提示结果。
+任务结束处调用（任意语言）：`.\qq-notify.ps1 -Message "任务完成"`，或双击 `qq.vbs` 输入即发。
 
-> ⚠️ `qq install`（改 PATH）和 `qq autostart on`（写启动项）需要在**普通终端**（双击 cmd 或手动打开 PowerShell）执行——DSH 沙箱环境会拦截注册表/系统目录写入。其余命令沙箱内也可用。
+## 配置
 
-## DSH 规范插件（推荐：零搜索直接调用）
+编辑 `qq-notify.config.json`（本目录），重启 DSH 生效：
 
-整套 QQ 通知功能已打包成**符合 DSH 规范的插件 `dsh-qq-notify`**（`dsh-qq-notify/` 目录，含 `dsh.bundle.patch` 声明 + cordis.patch.yml，可 `dsh plugin --profile web add file:<目录>` 安装、可发布到社区市场），提供 3 个原生工具：
+```json
+{
+  "mainQq": "940841288",             // 接收通知的主号
+  "apiPort": 3002,                   // NapCat HTTP 端口
+  "napcatDir": "D:\\...\\napcat",    // NapCat 目录
+  "webPanelPort": 3003,              // 网页控制台端口
+  "webPanelEnabled": true
+}
+```
 
-| 工具 | 作用 |
+## 故障排查
+
+| 现象 | 处理 |
 |---|---|
-| `qq_send` | 发 QQ 消息到主号（说"用QQ发：xxx"直接调用） |
-| `qq_status` | 查 NapCat 是否在线、登录账号 |
-| `qq_napcat` | 启停/重启 NapCat（start/stop/restart/status） |
-| `qq_deploy` | NapCat 自动部署引导（下载/解压/修复/扫码提示） |
+| 发送返回"无法获取用户信息" | 主号先加机器人小号为好友 |
+| 收到消息全是 `?` | 用本目录的 `qq-notify.ps1`（已修 UTF-8） |
+| 网页控制台打不开 | 检查 NapCat 是否运行；端口被占用就改 `webPanelPort` |
+| 机器人掉线 | `qq restart` 或网页点「重启」 |
 
-- **效果**：重启 DSH 后，任何会话说"用QQ发：xxx / QQ通知我"，模型直接工具调用——不用搜代码、零搜索、几乎零 token
-- 相当于把 Qclaw 的"内置发消息能力"搬进了 DSH，且比单工具版多了状态查询、NapCat 管理与自动部署
-- 验证：四工具均已模拟加载 + 真实执行通过（发送 status=ok）
-- **发布状态**：GitHub 仓库 [wodongx123/dsh-qq-notify](https://github.com/wodongx123/dsh-qq-notify)（10 commits），市场收录 PR [awesome-dsh-plugin#1502](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/1502)（notify 分类，待维护者合并）
-
-**重启 DSH 生效**：完全退出 DSH 桌面应用再重新打开 → 新会话即可直接说"用QQ发：xxx"。
-**重启前（当前会话）**：直接说"用QQ发：xxx"，我会调用 `qq-notify.ps1` 发送（效果相同，多花一点搜索 token）。
-
-## 结论摘要（2026-08 验证）
-
-- 官方机器人主动推送已停用；Qmsg 已停运 → **QQ 主动通知目前只能走 NapCat 等非官方协议**
-- 主号只接收、零风险；协议风险由机器人小号承担
-- **本机已重新部署并端到端实测通过（2026-08-17）**：
-  - NapCat v4.18.19 运行中，机器人小号 **3053818342** 已登录（快速登录 `-q`）
-  - OneBot HTTP API：`127.0.0.1:3002`（3000/3001 被 Docker 占用，已改端口）
-  - `qq-notify.ps1` 已配主号 **940841288**，中文消息实测发送成功（已修复 PS 5.1 ASCII 乱码）
-  - 一键启动：`.\start-napcat.ps1`
-  - 模式 B（QQ 远控 DSH 插件）未启用（如需可加装，见 DEPLOY.md §5）
+> 项目地址：https://github.com/wodongx123/dsh-qq-notify

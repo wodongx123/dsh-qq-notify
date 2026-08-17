@@ -1,61 +1,51 @@
-# dsh-qq-notify —— QQ 通知插件（DeepSeek Harness 规范）
+# dsh-qq-notify —— QQ 通知插件
 
-基于本机 [NapCat](https://github.com/NapNeko/NapCatQQ) 机器人的 QQ 通知通道，为 DSH 提供三个模型可直接调用的原生工具：
+通过本机 NapCat 机器人向主号 QQ 发送私聊通知。装好后在 DSH 里**直接说人话**就能发，还带一个**网页控制台**。
 
-| 工具 | 作用 |
-|---|---|
-| `qq_send` | 向主号 QQ（默认 `940841288`）发送私聊消息（走 OneBot HTTP `127.0.0.1:3002`）。零搜索原生调用 —— 说"用QQ发：…"即可直接发送。 |
-| `qq_status` | 查询 NapCat 是否在线、当前登录的机器人账号。 |
-| `qq_napcat` | 启停/重启/查询 NapCat（隐藏窗口启动，委托给 `qq.ps1`）。 |
+## 使用
 
-## 环境要求
+### ① 网页控制台（最直观）
 
-- Windows 10/11 x64，已部署本机 NapCat（部署步骤见父项目 `DEPLOY.md`）。
-- OneBot HTTP API 位于 `127.0.0.1:3002`（本机 Docker 占用了 3000/3001，故用 3002）。
-- 机器人小号 `3053818342` 已登录，且主号已加其为好友。
+浏览器打开 **http://127.0.0.1:3003**：
+
+- 通道状态：NapCat 在线/离线、机器人号
+- 发送框：输入消息 → 点「发送」
+- 管理按钮：启动 / 停止 / 重启 NapCat
+
+### ② 对话直接说（装好后自带 4 个工具）
+
+| 你说 | 触发工具 | 效果 |
+|---|---|---|
+| `用QQ发：任务完成了` | qq_send | 发到主号 |
+| `查一下QQ通道状态` | qq_status | NapCat 是否在线、机器人号 |
+| `启动QQ通知` / `重启NapCat` | qq_napcat | 后台启停 |
+| `帮我装好QQ通知` | qq_deploy | 自动下载部署 NapCat |
+
+### ③ 命令行（不用插件也能用）
+
+```bat
+qq send "消息"     qq status     qq start / stop / restart / logs
+```
 
 ## 配置
 
-三级配置，优先级从高到低：宿主组合 `config` > `qq-notify.config.json` > 内置默认：
+编辑部署目录下 `qq-notify.config.json`（重启 DSH 生效）：
 
-| 字段 | 默认 | 含义 |
-|---|---|---|
-| `mainQq` | `940841288` | 接收通知的主号 QQ |
-| `apiPort` | `3002` | NapCat OneBot HTTP API 端口 |
-| `napcatDir` | `D:\Project\qq-remote-deploy\napcat` | NapCat 部署目录（`qq_napcat` 管理用） |
-| `botQq` | `""`（自动探测） | 可选：指定机器人小号 |
-
-- **用户友好方式**：直接编辑部署目录下的 `qq-notify.config.json`（安装时已生成，重启 DSH 生效）。
-- **宿主组合方式**：在 `cordis.patch.yml` 插件条目的 `config:` 里覆盖。
-
-## 安装（作为 profile 组合包）
-
-在插件目录（或任意目录用相对路径）执行：
-
-```bash
-dsh plugin --profile web add file:D:/Project/qq-remote-deploy/dsh-qq-notify
-# 无 dsh CLI 时，在 profile 目录里直接:
-#   pnpm add file:D:/Project/qq-remote-deploy/dsh-qq-notify
+```json
+{
+  "mainQq": "940841288",
+  "apiPort": 3002,
+  "napcatDir": "D:\\...\\napcat",
+  "webPanelPort": 3003,
+  "webPanelEnabled": true
+}
 ```
 
-`package.json` 的 `dsh.bundle.patch` 声明会让 profile 组合器自动把 `dsh-qq-notify` 加入层栈。重启 DSH 后，任意会话即可直接调用这三个工具。
-
-## 开发自测
+## 安装
 
 ```bash
-node --check lib/index.js
-# 模拟 cordis 加载 + 工具注册 + 执行:
-node --input-type=module -e "const m = await import('dsh-qq-notify'); const r=[]; const ctx={tools:{register:t=>r.push(t)}}; m.apply(ctx); console.log(r.map(t=>t.name));"
+dsh plugin --profile web add file:<本目录>
+# 或放到 profiles\web\node_modules 并在 cordis.patch.yml 挂载
 ```
 
-## 发布到社区市场（可选）
-
-1. 把本包推到公开 GitHub 仓库。
-2. 向 [awesome-dsh-plugin registry](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 提交 PR，加入条目：
-   `{ "name": "dsh-qq-notify", "owner": "<你的ID>", "url": "<仓库>", "category": "notify", "description": { "en": "...", "zh": "..." }, "npm": null, "install": "dsh plugin --profile web add github:<你的ID>/dsh-qq-notify" }`
-3. 之后就会出现在应用内插件市场的"通知与集成"分类里。
-
-## 安全
-
-- NapCat HTTP/WebUI 仅监听 `127.0.0.1`，勿暴露公网。
-- 协议风险由机器人小号承担；主号只接收。
+重启 DSH 后生效。要求：Windows 10/11 x64、已部署 NapCat（可用 qq_deploy 自动装）、机器人小号已登录且主号已加好友。
