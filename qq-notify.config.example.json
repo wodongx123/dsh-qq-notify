@@ -4,6 +4,5 @@
   "apiPort": 3002,
   "napcatDir": "D:\\Project\\qq-remote-deploy\\napcat",
   "botQq": "",
-  "webPanelPort": 3003,
   "webPanelEnabled": true
 }

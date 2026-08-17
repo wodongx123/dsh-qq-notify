@@ -12,7 +12,7 @@
 
 ### 方式一：网页控制台（最直观）
 
-浏览器打开 **http://127.0.0.1:3003**（QQ 通知控制台）：
+在 DSH 网页界面地址后加 **`/qq-panel`**（例如 `http://127.0.0.1:52364/qq-panel`，随 DSH 端口，**不需要额外端口**）：
 
 - 上方：通道状态（NapCat 在线/离线、机器人号）
 - 中间：输入消息 → 点「发送」
@@ -50,10 +50,11 @@ qq autostart on                    :: 开机自启（隐藏窗口）
   "mainQq": "940841288",             // 接收通知的主号
   "apiPort": 3002,                   // NapCat HTTP 端口
   "napcatDir": "D:\\...\\napcat",    // NapCat 目录
-  "webPanelPort": 3003,              // 网页控制台端口
-  "webPanelEnabled": true
+  "webPanelEnabled": true            // 网页控制台开关（挂 DSH Web 的 /qq-panel）
 }
 ```
+
+> 插件本身**不需要端口**：4 个工具在 DSH 进程内直接调 NapCat；网页控制台挂在 DSH 现有 Web 上（`/qq-panel`）。只有 NapCat（第三方）占用 3002/6099。
 
 ## 故障排查
 
@@ -61,7 +62,7 @@ qq autostart on                    :: 开机自启（隐藏窗口）
 |---|---|
 | 发送返回"无法获取用户信息" | 主号先加机器人小号为好友 |
 | 收到消息全是 `?` | 用本目录的 `qq-notify.ps1`（已修 UTF-8） |
-| 网页控制台打不开 | 检查 NapCat 是否运行；端口被占用就改 `webPanelPort` |
+| 网页控制台打不开 | 检查 DSH 是否重启、NapCat 是否运行；`/qq-panel` 随 DSH 端口变化 |
 | 机器人掉线 | `qq restart` 或网页点「重启」 |
 
 > 项目地址：https://github.com/wodongx123/dsh-qq-notify

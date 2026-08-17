@@ -1,12 +1,12 @@
 # dsh-qq-notify —— QQ 通知插件
 
-通过本机 NapCat 机器人向主号 QQ 发送私聊通知。装好后在 DSH 里**直接说人话**就能发，还带一个**网页控制台**。
+通过本机 NapCat 机器人向主号 QQ 发送私聊通知。装好后在 DSH 里**直接说人话**就能发，还带一个**网页控制台**（挂在 DSH 现有 Web 上，无独立端口）。
 
 ## 使用
 
-### ① 网页控制台（最直观）
+### ① 网页控制台
 
-浏览器打开 **http://127.0.0.1:3003**：
+在 DSH 网页地址后加 `/qq-panel`（如 `http://127.0.0.1:52364/qq-panel`，端口随 DSH）：
 
 - 通道状态：NapCat 在线/离线、机器人号
 - 发送框：输入消息 → 点「发送」
@@ -36,10 +36,11 @@ qq send "消息"     qq status     qq start / stop / restart / logs
   "mainQq": "940841288",
   "apiPort": 3002,
   "napcatDir": "D:\\...\\napcat",
-  "webPanelPort": 3003,
   "webPanelEnabled": true
 }
 ```
+
+> 插件本身不需要端口（工具进程内直连 NapCat；网页控制台挂在 DSH Web 的 `/qq-panel`）。
 
 ## 安装
 

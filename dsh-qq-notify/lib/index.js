@@ -11,7 +11,7 @@
 //   napcatDir      NapCat 部署目录（默认 D:\Project\qq-remote-deploy\napcat）
 //   botQq          机器人小号 QQ（默认空 = 自动从 get_login_info 查询）
 //   webPanelPort   网页面板端口（默认 3003）
-//   webPanelEnabled 是否启用网页面板（默认 true）
+//   webPanelEnabled 是否启用网页面板（默认 true，挂载于 DSH 现有 Web 服务 /qq-panel，零新增端口）
 // 配置文件: 部署目录下 qq-notify.config.json（用户可直接编辑）
 import z from "@deepseek-ai/schemastery";
 import { defineTool } from "@deepseek-ai/dsh-tools";
@@ -19,15 +19,15 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createServer } from "node:http";
 
 const execFileP = promisify(execFile);
 
 const name = "qq-notify";
-const inject = ["tools"];
+const inject = ["tools", "webServer"];
 
 const QQ_DIR = "D:\\Project\\qq-remote-deploy";
 const CONFIG_FILE = join(QQ_DIR, "qq-notify.config.json");
+const PANEL_PATH = "/qq-panel";
 
 /** Schemastery configuration: exposed via the host composition (cordis.patch.yml config) */
 const Config = z.object({
@@ -35,7 +35,6 @@ const Config = z.object({
   apiPort: z.number().default(3002),
   napcatDir: z.string().default(join(QQ_DIR, "napcat")),
   botQq: z.string().default(""),
-  webPanelPort: z.number().default(3003),
   webPanelEnabled: z.boolean().default(true)
 });
 
@@ -44,7 +43,6 @@ const DEFAULTS = {
   apiPort: 3002,
   napcatDir: join(QQ_DIR, "napcat"),
   botQq: "",
-  webPanelPort: 3003,
   webPanelEnabled: true
 };
 
@@ -219,91 +217,100 @@ function apply(ctx, config) {
     }
   }));
 
-  if (cfg.webPanelEnabled !== false) startWebPanel(cfg);
-  console.log(`[qq-notify] active | mainQq=${cfg.mainQq} apiPort=${cfg.apiPort} napcatDir=${cfg.napcatDir}${cfg.botQq ? ` botQq=${cfg.botQq}` : ""} webPanel=http://127.0.0.1:${cfg.webPanelPort}`);
+  if (cfg.webPanelEnabled !== false) mountWebPanel(ctx, cfg);
+  console.log(`[qq-notify] active | mainQq=${cfg.mainQq} apiPort=${cfg.apiPort} napcatDir=${cfg.napcatDir}${cfg.botQq ? ` botQq=${cfg.botQq}` : ""} panel=${PANEL_PATH}`);
 }
 
-// ================= 网页控制面板 =================
-function startWebPanel(cfg) {
-  const server = createServer(async (req, res) => {
-    try {
-      const url = new URL(req.url || "/", `http://127.0.0.1:${cfg.webPanelPort}`);
-      const path = url.pathname;
-      res.setHeader("Cache-Control", "no-store");
+// ================= 网页控制面板（挂在 DSH 现有 Web 服务上，零新增端口）=================
+function mountWebPanel(ctx, cfg) {
+  const webServer = ctx.webServer;
+  if (!webServer || typeof webServer.register !== "function") {
+    console.log("[qq-notify] webServer 服务不可用，网页面板未挂载（工具不受影响）");
+    return;
+  }
+  try {
+    ctx.effect(() => webServer.register({
+      kind: "exact",
+      path: PANEL_PATH,
+      handler: async (req, res) => {
+        try {
+          const url = new URL(req.url || "/", "http://dsh");
+          const path = url.pathname;
+          res.setHeader("Cache-Control", "no-store");
 
-      // 页面
-      if (req.method === "GET" && (path === "/" || path === "/index.html")) {
-        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-        res.end(PANEL_HTML);
-        return;
-      }
-      // 状态
-      if (req.method === "GET" && path === "/api/status") {
-        let login = null;
-        try {
-          const resp = await fetch(`${apiBase(cfg)}/get_login_info`, { signal: AbortSignal.timeout(5000) });
-          if (resp.ok) { const d = await resp.json(); if (d.status === "ok") login = d.data; }
-        } catch { /* offline */ }
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-          running: login !== null,
-          apiPort: cfg.apiPort,
-          mainQq: cfg.mainQq,
-          botUserId: login ? login.user_id : null,
-          botNickname: login ? login.nickname : null,
-          webPanelPort: cfg.webPanelPort
-        }));
-        return;
-      }
-      // 发送
-      if (req.method === "POST" && path === "/api/send") {
-        const body = JSON.parse(await readBody(req));
-        const message = String(body.message || "").trim();
-        const to = body.to ? Number(body.to) : Number(cfg.mainQq);
-        if (!message) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ ok: false, error: "消息为空" })); return; }
-        try {
-          const resp = await fetch(`${apiBase(cfg)}/send_private_msg`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_id: to, message })
-          });
-          const data = await resp.json();
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ ok: data.status === "ok", status: data.status, wording: data.wording || data.message || "" }));
+          // 页面
+          if (req.method === "GET" && (path === PANEL_PATH || path === PANEL_PATH + "/")) {
+            res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+            res.end(PANEL_HTML);
+            return;
+          }
+          // 状态
+          if (req.method === "GET" && path === PANEL_PATH + "/api/status") {
+            let login = null;
+            try {
+              const resp = await fetch(`${apiBase(cfg)}/get_login_info`, { signal: AbortSignal.timeout(5000) });
+              if (resp.ok) { const d = await resp.json(); if (d.status === "ok") login = d.data; }
+            } catch { /* offline */ }
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({
+              running: login !== null,
+              apiPort: cfg.apiPort,
+              mainQq: cfg.mainQq,
+              botUserId: login ? login.user_id : null,
+              botNickname: login ? login.nickname : null,
+              panelPath: PANEL_PATH
+            }));
+            return;
+          }
+          // 发送
+          if (req.method === "POST" && path === PANEL_PATH + "/api/send") {
+            const body = JSON.parse(await readBody(req));
+            const message = String(body.message || "").trim();
+            const to = body.to ? Number(body.to) : Number(cfg.mainQq);
+            if (!message) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ ok: false, error: "消息为空" })); return; }
+            try {
+              const resp = await fetch(`${apiBase(cfg)}/send_private_msg`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: to, message })
+              });
+              const data = await resp.json();
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ ok: data.status === "ok", status: data.status, wording: data.wording || data.message || "" }));
+            } catch (err) {
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ ok: false, error: `NapCat 未运行或端口不通: ${err.message || err}` }));
+            }
+            return;
+          }
+          // NapCat 管理
+          if (req.method === "POST" && path === PANEL_PATH + "/api/napcat") {
+            const body = JSON.parse(await readBody(req));
+            const action = String(body.action || "status");
+            if (!["start", "stop", "restart", "status"].includes(action)) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ ok: false, error: `未知操作: ${action}` }));
+              return;
+            }
+            const output = await runQqPs(cfg, action);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: true, output }));
+            return;
+          }
+          res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("404 not found");
         } catch (err) {
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ ok: false, error: `NapCat 未运行或端口不通: ${err.message || err}` }));
+          try {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: false, error: String(err && err.message || err) }));
+          } catch { /* response already sent */ }
         }
-        return;
       }
-      // NapCat 管理
-      if (req.method === "POST" && path === "/api/napcat") {
-        const body = JSON.parse(await readBody(req));
-        const action = String(body.action || "status");
-        if (!["start", "stop", "restart", "status"].includes(action)) {
-          res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ ok: false, error: `未知操作: ${action}` }));
-          return;
-        }
-        const output = await runQqPs(cfg, action);
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, output }));
-        return;
-      }
-      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-      res.end("404 not found");
-    } catch (err) {
-      try {
-        res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: false, error: String(err && err.message || err) }));
-      } catch { /* response already sent */ }
-    }
-  });
-  server.on("error", (err) => {
-    console.log(`[qq-notify] web panel error on ${cfg.webPanelPort}: ${err && err.message ? err.message : err}`);
-  });
-  server.listen(cfg.webPanelPort, "127.0.0.1");
-  console.log(`[qq-notify] 网页控制面板: http://127.0.0.1:${cfg.webPanelPort}`);
+    }), "qq-notify panel route");
+    console.log(`[qq-notify] 网页控制面板已挂载: ${PANEL_PATH}（DSH Web 服务内，无独立端口）`);
+  } catch (err) {
+    console.log(`[qq-notify] 网页面板挂载失败: ${err && err.message ? err.message : err}（工具不受影响）`);
+  }
 }
 
 function readBody(req) {
@@ -387,7 +394,7 @@ const PANEL_HTML = `<!DOCTYPE html>
 async function j(f){ const r = await fetch(f, {headers:{'Accept':'application/json'}}); return r.json(); }
 async function post(f, b){ const r = await fetch(f, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(b)}); return r.json(); }
 async function refresh(){
-  const s = await j('/api/status');
+  const s = await j('${PANEL_PATH}/api/status');
   const badge = document.getElementById('badge');
   badge.className = 'badge ' + (s.running ? 'ok' : 'bad');
   badge.textContent = s.running ? '在线' : '离线';
@@ -401,7 +408,7 @@ async function sendMsg(){
   const btn = document.getElementById('sendBtn');
   btn.disabled = true; el.className = 'msg'; el.textContent = '发送中…';
   try {
-    const r = await post('/api/send', { message: document.getElementById('message').value, to: document.getElementById('to').value || undefined });
+    const r = await post('${PANEL_PATH}/api/send', { message: document.getElementById('message').value, to: document.getElementById('to').value || undefined });
     if (r.ok) { el.className = 'msg ok'; el.textContent = '✅ 已发送' + (r.wording ? '（' + r.wording + '）' : ''); document.getElementById('message').value = ''; }
     else { el.className = 'msg err'; el.textContent = '❌ ' + (r.error || r.wording || '发送失败'); }
   } catch(e){ el.className = 'msg err'; el.textContent = '❌ 请求出错: ' + e; }
@@ -411,7 +418,7 @@ async function sendMsg(){
 async function napcat(action){
   const out = document.getElementById('napcatOut');
   out.textContent = '执行 ' + action + ' …（NapCat 启动约需 20 秒）';
-  const r = await post('/api/napcat', { action });
+  const r = await post('${PANEL_PATH}/api/napcat', { action });
   out.textContent = r.output || (r.error || '（无输出）');
   refresh();
 }

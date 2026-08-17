@@ -1,12 +1,12 @@
 # dsh-qq-notify
 
-Send QQ private-message notifications to your main account via a local NapCat bot. Four native DSH tools + a **web console**.
+Send QQ private-message notifications to your main account via a local NapCat bot. Four native DSH tools + a **web console** mounted on the DSH web server (no extra port).
 
 ## Usage
 
 ### ① Web console
 
-Open **http://127.0.0.1:3003** in a browser:
+Append `/qq-panel` to the DSH web URL (e.g. `http://127.0.0.1:52364/qq-panel`):
 
 - Channel status (NapCat online/offline, bot account)
 - Message box → "Send"
@@ -36,10 +36,11 @@ Edit `qq-notify.config.json` next to the deployment (effective after DSH restart
   "mainQq": "940841288",
   "apiPort": 3002,
   "napcatDir": "D:\\...\\napcat",
-  "webPanelPort": 3003,
   "webPanelEnabled": true
 }
 ```
+
+> The plugin itself needs no port (tools call NapCat in-process; the web console is mounted at `/qq-panel` on the DSH web server).
 
 ## Install
 
