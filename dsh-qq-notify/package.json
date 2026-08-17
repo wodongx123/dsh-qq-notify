@@ -1,0 +1,39 @@
+{
+  "name": "dsh-qq-notify",
+  "version": "0.1.0",
+  "description": "QQ notifications via local NapCat: qq_send / qq_status / qq_napcat tools. 中文: 通过本机 NapCat 向主号 QQ 发送通知，附状态查询与 NapCat 管理工具。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "qq",
+    "napcat",
+    "notify",
+    "notification",
+    "onebot"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.6"
+  }
+}
