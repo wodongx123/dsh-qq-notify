@@ -48,11 +48,12 @@ qq install      :: 把本目录加入 PATH（新开终端后任意目录可用 q
 | `qq_send` | 发 QQ 消息到主号（说"用QQ发：xxx"直接调用） |
 | `qq_status` | 查 NapCat 是否在线、登录账号 |
 | `qq_napcat` | 启停/重启 NapCat（start/stop/restart/status） |
+| `qq_deploy` | NapCat 自动部署引导（下载/解压/修复/扫码提示） |
 
 - **效果**：重启 DSH 后，任何会话说"用QQ发：xxx / QQ通知我"，模型直接工具调用——不用搜代码、零搜索、几乎零 token
-- 相当于把 Qclaw 的"内置发消息能力"搬进了 DSH，且比单工具版多了状态查询与 NapCat 管理
-- 验证：三工具均已模拟加载 + 真实执行通过（发送 status=ok）
-- 发布到 dsh-market：见 `dsh-qq-notify/README.md`（提交 awesome-dsh-plugin registry，分类 Notifications & Integrations）
+- 相当于把 Qclaw 的"内置发消息能力"搬进了 DSH，且比单工具版多了状态查询、NapCat 管理与自动部署
+- 验证：四工具均已模拟加载 + 真实执行通过（发送 status=ok）
+- **发布状态**：GitHub 仓库 [wodongx123/dsh-qq-notify](https://github.com/wodongx123/dsh-qq-notify)（10 commits），市场收录 PR [awesome-dsh-plugin#1502](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/1502)（notify 分类，待维护者合并）
 
 **重启 DSH 生效**：完全退出 DSH 桌面应用再重新打开 → 新会话即可直接说"用QQ发：xxx"。
 **重启前（当前会话）**：直接说"用QQ发：xxx"，我会调用 `qq-notify.ps1` 发送（效果相同，多花一点搜索 token）。
