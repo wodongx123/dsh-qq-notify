@@ -1,60 +1,50 @@
-# QQ 任务通知 / 远控通道（DSH）
+# QQ 通知通道
 
-在 DeepSeek Harness（DSH）上实现：**耗时任务完成 → QQ 主动通知你**。底层用本机 NapCat 机器人（非官方协议，小号承担风险，主号零风险）。
+## 怎么用（3 种方式）
 
-## 快速开始（只需 3 步）
+### 1. 网页控制台（双击即用，最推荐）
 
-1. **确认 NapCat 在运行**：命令行执行 `qq status`，显示"HTTP API 3002 监听中"即可；没运行就 `qq start`
-2. **重启 DSH**（让插件加载，只需要做一次）
-3. 之后任选一种方式发通知 👇
+**`qq-panel.html` 文件就是控制台** —— 双击打开浏览器就能用：
 
-## 怎么用
-
-### 方式一：网页控制台（最直观）
-
-在 DSH 网页界面地址后加 **`/qq-panel`**（例如 `http://127.0.0.1:52364/qq-panel`，随 DSH 端口，**不需要额外端口**）：
-
-- 上方：通道状态（NapCat 在线/离线、机器人号）
+- 上方：NapCat 在线/离线状态、机器人号
 - 中间：输入消息 → 点「发送」
-- 下方：NapCat 启动 / 停止 / 重启 按钮
+- 下方：启动 / 停止 / 重启 NapCat
 
-### 方式二：直接对话（和 Qclaw 一样）
+不依赖 DSH 在线，不用开新端口，直接调本机 3002 端口。
 
-重启 DSH 后，在任意会话里直接说：
+### 2. DSH 对话中直接说
+
+重启 DSH 后，在会话里说就行：
 
 | 你说 | 效果 |
 |---|---|
-| `用QQ发：任务完成了` | 发送到主号 940841288 |
-| `发QQ消息：构建成功` / `QQ通知我：...` | 同上 |
-| `查一下QQ通道状态` | 返回 NapCat 是否在线、机器人号 |
-| `启动QQ通知` / `重启NapCat` | 后台启停 NapCat |
-| `帮我装好QQ通知` | 自动下载部署 NapCat 并引导扫码 |
+| `用QQ发：任务完成了` | 发到主号 |
+| `查一下QQ通道状态` | 返回 NapCat 是否在线 |
+| `我的QQ主号改成 xxx` | 改配置（自动保存） |
+| `查看当前QQ配置` | 显示所有配置项 |
+| `启动QQ通知` / `重启NapCat` | 后台管理 NapCat |
+| `帮我装好QQ通知` | 自动下载部署 NapCat |
 
-### 方式三：命令行 / 脚本
+### 3. 命令行
 
 ```bat
-qq send "备份完成，耗时 12 分钟"   :: 发通知（默认发到主号）
-qq status                          :: 查状态
-qq start / qq stop / qq logs       :: 启停 NapCat、看日志
-qq autostart on                    :: 开机自启（隐藏窗口）
+qq send "消息"     qq status     qq start / stop / restart / logs
 ```
-
-任务结束处调用（任意语言）：`.\qq-notify.ps1 -Message "任务完成"`，或双击 `qq.vbs` 输入即发。
 
 ## 配置
 
-编辑 `qq-notify.config.json`（本目录），重启 DSH 生效：
+方法一：DSH 里对我说  
+- 「查看当前QQ配置」→ 看所有配置  
+- 「QQ主号改成 xxx」→ 自动改配置文件并保存
 
+方法二：编辑 `qq-notify.config.json`  
 ```json
 {
-  "mainQq": "940841288",             // 接收通知的主号
-  "apiPort": 3002,                   // NapCat HTTP 端口
-  "napcatDir": "D:\\...\\napcat",    // NapCat 目录
-  "webPanelEnabled": true            // 网页控制台开关（挂 DSH Web 的 /qq-panel）
+  "mainQq": "940841288",
+  "_说明": "接收通知的主号 QQ。留空或删掉本文件则用内置默认值。"
 }
 ```
-
-> 插件本身**不需要端口**：4 个工具在 DSH 进程内直接调 NapCat；网页控制台挂在 DSH 现有 Web 上（`/qq-panel`）。只有 NapCat（第三方）占用 3002/6099。
+改完保存即可（工具级别即时生效，网页控制台始终读 NapCat 实时信息）。
 
 ## 故障排查
 
@@ -62,7 +52,7 @@ qq autostart on                    :: 开机自启（隐藏窗口）
 |---|---|
 | 发送返回"无法获取用户信息" | 主号先加机器人小号为好友 |
 | 收到消息全是 `?` | 用本目录的 `qq-notify.ps1`（已修 UTF-8） |
-| 网页控制台打不开 | 检查 DSH 是否重启、NapCat 是否运行；`/qq-panel` 随 DSH 端口变化 |
+| 网页控制台连不上 | 确认 NapCat 已运行（`qq start`） |
 | 机器人掉线 | `qq restart` 或网页点「重启」 |
 
 > 项目地址：https://github.com/wodongx123/dsh-qq-notify

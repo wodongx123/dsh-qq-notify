@@ -1,4 +1,4 @@
-﻿// dsh-qq-notify —— 符合 DSH 规范的 QQ 通知插件（含配置机制 + 网页控制面板）
+// dsh-qq-notify —— 符合 DSH 规范的 QQ 通知插件（含配置机制 + 网页控制面板）
 // 工具:
 //   qq_send       向主号 QQ 发送私聊消息（NapCat OneBot HTTP API）
 //   qq_status     查询 NapCat 在线状态 / 登录账号
@@ -17,7 +17,7 @@ import z from "@deepseek-ai/schemastery";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const execFileP = promisify(execFile);
@@ -217,6 +217,44 @@ function apply(ctx, config) {
     }
   }));
 
+  // 配置管理工具 — qq_config_show / qq_config_set
+  ctx.tools.register(defineTool({
+    name: "qq_config_show",
+    description: "Show the current QQ notification configuration (mainQq, apiPort, napcatDir, botQq, webPanelEnabled).",
+    parameters: {},
+    output: {
+      schema: { type: "object", additionalProperties: false, properties: { config: { type: "string", required: true } } },
+      render: (_a, v) => [{ type: "text", text: v.config }]
+    },
+    async execute() {
+      var lines = Object.entries(cfg).map(function(k,v){return `  ${k} = ${v}`}).join("\n");
+      return { config: lines };
+    }
+  }));
+  ctx.tools.register(defineTool({
+    name: "qq_config_set",
+    description: "Set a configuration value for the QQ notification plugin and save it to disk. Valid keys: mainQq (接收通知的主号 QQ), apiPort (NapCat HTTP端口), napcatDir (NapCat部署目录), botQq (机器人小号QQ), webPanelEnabled (是否启用DSH内嵌网页面板).",
+    parameters: {
+      key: { type: "string", required: true, description: "Configuration key to set." },
+      value: { type: "string", required: true, description: "New value as a string (will be converted to number/boolean as needed)." }
+    },
+    output: {
+      schema: { type: "object", additionalProperties: false, properties: { message: { type: "string", required: true } } },
+      render: (_a, v) => [{ type: "text", text: v.message }]
+    },
+    async execute(args) {
+      var kv = args.key; var raw = args.value;
+      var VALID_KEYS = ["mainQq","apiPort","napcatDir","botQq","webPanelEnabled"];
+      if (!VALID_KEYS.includes(kv)) throw new Error("Invalid key. Choose one of: " + VALID_KEYS.join(", "));
+      var parsed = raw;
+      if (kv === "apiPort" || kv === "webPanelPort") { parsed = Number(raw); if (!Number.isInteger(parsed)) throw new Error("Value must be an integer"); }
+      else if (kv === "webPanelEnabled") { parsed = raw.toLowerCase() === "true"; }
+      cfg[kv] = parsed;
+      try { writeFileSync(CONFIG_FILE, JSON.stringify({...DEFAULTS,...loadFileConfig(),...cfg}, null, 2)+"\n","utf8"); } catch {}
+      return { message: `已更新 ${kv} → ${parsed}` };
+    }
+  }));
+
   if (cfg.webPanelEnabled !== false) mountWebPanel(ctx, cfg);
   console.log(`[qq-notify] active | mainQq=${cfg.mainQq} apiPort=${cfg.apiPort} napcatDir=${cfg.napcatDir}${cfg.botQq ? ` botQq=${cfg.botQq}` : ""} panel=${PANEL_PATH}`);
 }
@@ -230,7 +268,7 @@ function mountWebPanel(ctx, cfg) {
   }
   try {
     ctx.effect(() => webServer.register({
-      kind: "exact",
+      kind: "prefix",
       path: PANEL_PATH,
       handler: async (req, res) => {
         try {

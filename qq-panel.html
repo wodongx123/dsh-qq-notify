@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QQ 通知控制台</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Microsoft YaHei",system-ui,sans-serif;background:#f5f6fa;color:#2c3e50;padding:24px}.wrap{max-width:640px;margin:0 auto}h1{font-size:22px;margin-bottom:4px}.sub{color:#7f8c8d;font-size:13px;margin-bottom:20px}.card{background:#fff;border-radius:10px;padding:18px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.08)}.card h2{font-size:15px;margin-bottom:12px;color:#34495e}.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}.badge.ok{background:#e8f8ef;color:#1e8449}.badge.bad{background:#fdecea;color:#c0392b}.kv{font-size:13px;line-height:1.9}.kv b{color:#2c3e50}input[type=text],textarea{width:100%;border:1px solid #dcdde1;border-radius:6px;padding:10px;font-size:14px;font-family:inherit}textarea{min-height:84px;margin-top:10px}.btn{border:none;border-radius:6px;padding:9px 18px;font-size:14px;cursor:pointer;color:#fff}.btn.primary{background:#2e86de}.btn.success{background:#1e8449}.btn.danger{background:#c0392b}.btn.warn{background:#e67e22}.btn.ghost{background:#95a5a6}.btn:disabled{opacity:.55;cursor:not-allowed}.out{background:#f8f9fa;border:1px solid #eef0f2;border-radius:6px;padding:10px;font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;max-height:200px;overflow:auto;color:#34495e;margin-top:12px}.msg{font-size:13px;margin-top:8px}.msg.ok{color:#1e8449}.msg.err{color:#c0392b}table{width:100%;margin-top:12px;border-collapse:collapse}td,th{text-align:left;padding:5px 0;font-size:13px;border-bottom:1px solid #f0f0f0}th{color:#95a5a6;width:80px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>💬 QQ 通知控制台</h1>
+<p class="sub">直接连接本机 NapCat · 无需 DSH 在线 · 双击即用</p>
+
+<!-- 状态 -->
+<div class="card">
+<div class="row" style="justify-content:space-between">
+<h2 style="margin:0">通道状态</h2>
+<span id="badge" class="badge bad">检测中…</span>
+</div>
+<div class="kv" id="statusInfo" style="margin-top:10px">加载中…</div>
+<table><tbody id="configBody"></tbody></table>
+</div>
+
+<!-- 发消息 -->
+<div class="card">
+<h2>发送 QQ 消息</h2>
+<input type="text" id="to" placeholder="接收 QQ 号（留空 = 主号）"><br>
+<textarea id="message" placeholder="输入要发送的消息内容…"></textarea>
+<button class="btn primary" onclick="sendMsg()">发送</button>
+<div class="msg" id="sendResult"></div>
+</div>
+
+<!-- 管理 -->
+<div class="card">
+<h2>NapCat 管理</h2>
+<div class="row">
+<button class="btn success" onclick="napcat('start')">启动</button>
+<button class="btn danger" onclick="napcat('stop')">停止</button>
+<button class="btn warn" onclick="napcat('restart')">重启</button>
+<button class="btn ghost" onclick="refreshStatus()">刷新</button>
+</div>
+<div class="out" id="napcatOut">（操作输出会显示在这里）</div>
+</div>
+</div>
+<script>
+var B='http://127.0.0.1:3002';
+async function j(p){return(await fetch(B+p,{headers:{Accept:'application/json'}})).json()}
+async function post(p,b){return(await fetch(B+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)})).json()}
+var mainQq='940841288';// default, will be updated by config tool or manual input
+
+async function refreshStatus(){
+try{var s=await j('/get_login_info');
+document.getElementById('badge').className='badge ok';
+document.getElementById('badge').textContent='在线';
+document.getElementById('statusInfo').innerHTML='<b>机器人:</b> '+s.data.user_id+' ('+s.data.nickname+')';
+}catch(e){
+document.getElementById('badge').className='badge bad';
+document.getElementById('badge').textContent='离线';
+document.getElementById('statusInfo').textContent='⚠ NapCat 未运行（请确认已 qq start）'}
+}
+
+async function sendMsg(){
+var el=document.getElementById('sendResult'),btn=event.target;
+btn.disabled=true;el.className='msg';el.textContent='发送中…';
+try{
+var r=await post('/send_private_msg',{user_id:Number(document.getElementById('to').value||mainQq),message:document.getElementById('message').value.trim()});
+if(r.status==='ok'){el.className='msg ok';el.textContent='✅ 已发送！';document.getElementById('message').value=''}
+else{el.className='msg err';el.textContent='❌ '+r.wording}
+}catch(e){el.className='msg err';el.textContent='❌ 请求失败: '+e.message}
+btn.disabled=false
+}
+
+async function napcat(action){
+var out=document.getElementById('napcatOut');
+out.textContent='执行 ' + action + ' …';
+try{
+var r=await post('/'+action);
+out.textContent=r.output||('（无输出，可能已在运行）');
+}catch(e){out.textContent='错误: '+e.message}
+refreshStatus()
+}
+
+refreshStatus();setInterval(refreshStatus,10000)
+</script>
+</body>
+</html>
