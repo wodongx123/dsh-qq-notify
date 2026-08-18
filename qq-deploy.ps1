@@ -90,8 +90,8 @@ if ((Test-Path $wrapper) -and -not (Test-Path (Join-Path $Dir "crypto.dll"))) {
 Write-Step "部署完成: $Dir"
 if (-not (Test-Path (Join-Path $Dir "crypto.dll"))) {
   Write-Step ""
-  Write-Step "⚠️ 未检测到已安装的 QQ/腾讯系客户端，跳过 crypto.dll/ssl.dll 修复。"
-  Write-Step "如启动时报 'crypto.dll 缺失' 或 'ssl.dll 缺失'，请先安装一个 QQ（或微信），再运行一次本脚本。"
+  Write-Step "ℹ️ 未检测到加密模块（crypto.dll/ssl.dll）。"
+  Write-Step "如果 NapCat 能正常启动则无需处理；若遇到报错，请先安装一个 QQ（https://im.qq.com/）再重跑一次本脚本。"
 } else {
   Write-Step "已预置加密模块。"
 }
