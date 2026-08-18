@@ -55,14 +55,127 @@ function loadFileConfig(rootDir) {
   return {};
 }
 
-function findNapcatDir(cfg) {
-  if (cfg.napcatDir && existsSync(join(cfg.napcatDir, "node.exe"))) return cfg.napcatDir;
-  const root = discoverRoot();
-  const candidates = [join(root, "napcat"), join(root, "..", "napcat")];
-  for (const c of candidates) {
-    if (existsSync(c)) return c;
+// ================= NapCat 自动发现引擎 =================
+
+/** NapCat Shell 的标志性文件 —— 用于精确识别部署目录 */
+const NAPCAT_SIGNATURE = ["index.js", "qq.ps1", "node.exe"];
+
+/** 判断某目录是否是一个合法的 NapCat 部署 */
+function isNapcatDir(dir) {
+  if (!dir || !existsSync(dir)) return false;
+  for (const sig of NAPCAT_SIGNATURE) {
+    if (!existsSync(join(dir, sig))) return false;
   }
-  return join(root, "napcat");
+  return true;
+}
+
+/** 判断目录看起来像 NapCat Shell（宽松匹配，至少含 napcat 文件夹） */
+function looksLikeNapcatShell(dir) {
+  if (!dir || !existsSync(dir)) return false;
+  const files = readdirSync(dir);
+  // NapCat Shell zip 解压后必定包含这些文件中的大部分
+  const hasNodeExe = files.includes("node.exe");
+  const hasIndexJs = files.includes("index.js");
+  const hasNapcatSub = existsSync(join(dir, "napcat")) && statSync(join(dir, "napcat")).isDirectory();
+  return hasNodeExe && hasIndexJs && hasNapcatSub;
+}
+
+/** 内置常见 NapCat 安装位置（按优先级排序）*/
+const KNOWN_NAPCAT_PATHS = [
+  join(process.env.HOME || process.env.USERPROFILE || "", "NapCat"),       // %USERPROFILE%\NapCat
+  join(process.env.LOCALAPPDATA || "", "Programs\\NapCat"),                // %LOCALAPPDATA%\Programs\NapCat
+  "D:\\NapCat",                                                            // D:\NapCat
+  "C:\\NapCat",                                                            // C:\NapCat
+  "D:\\Project\\napcat",                                                   // D:\Project\napcat
+  "D:\\Tools\\napcat",                                                     // D:\Tools\napcat
+];
+
+/**
+ * 全机扫描 NapCat 实例
+ * @param {string} root - 扫描根目录；空字符串则扫描用户目录 + 常用驱动
+ * @param {number} maxDepth - 最大递归深度（防止太慢）
+ */
+function scanForNapcat(root = "", maxDepth = 8) {
+  const results = [];
+  
+  // 确定起始路径列表
+  const startDirs = root ? [root] : [
+    ...KNOWN_NAPCAT_PATHS,                        // 已知常用路径
+    ...(process.env.HOME || process.env.USERPROFILE || "") ? [process.env.HOME || process.env.USERPROFILE || ""] : [],
+  ];
+
+  function _scan(dir, depth) {
+    if (depth > maxDepth || !existsSync(dir)) return;
+    try {
+      for (const entry of readdirSync(dir)) {
+        const fullPath = join(dir, entry);
+        const relPath = relative(startDirs[0], fullPath);
+        try {
+          const st = statSync(fullPath);
+          if (st.isDirectory()) {
+            // 快速预检：只深入可能包含 NapCat 的目录
+            const nameLower = entry.toLowerCase();
+            if (nameLower === "napcat" || nameLower === "napcatqq" || nameLower.startsWith("napcat")) {
+              if (isNapcatDir(fullPath)) {
+                results.push({ dir: fullPath, exact: true });
+              } else {
+                _scan(fullPath, depth + 1);
+              }
+            } else if (depth < maxDepth - 1) {
+              // 浅层不匹配也继续探索
+              _scan(fullPath, depth + 1);
+            }
+          } else if (entry === "qq.ps1") {
+            // 找到 qq.ps1 说明父目录就是 NapCat
+            const parent = dirname(fullPath);
+            if (!results.find(r => r.dir === parent)) {
+              results.push({ dir: parent, exact: true });
+            }
+          }
+        } catch (e) { /* permission denied, skip */ }
+      }
+    } catch (e) { /* can't read dir, skip */ }
+  }
+
+  for (const sd of startDirs) {
+    _scan(sd, 1);
+  }
+
+  // 去重
+  const seen = new Set();
+  return results.filter(r => {
+    if (seen.has(r.dir)) return false;
+    seen.add(r.dir);
+    return true;
+  });
+}
+
+/**
+ * 增强版 findNapcatDir — 先查配置，再查已知路径，最后才回退到项目子目录
+ */
+function findNapcatDir(cfg) {
+  // 1. 配置里指定的优先
+  if (cfg.napcatDir && existsSync(join(cfg.napcatDir, "node.exe"))) return cfg.napcatDir;
+
+  // 2. 查内置知名路径
+  for (const p of KNOWN_NAPCAT_PATHS) {
+    if (isNapcatDir(p)) return p;
+  }
+
+  // 3. 查项目相对路径
+  const root = discoverRoot();
+  const candidates = [
+    join(root, "napcat"),
+    join(root, "..", "napcat"),
+    join(root, "packages", "napcat"),
+    join(root, "bot", "napcat"),
+  ];
+  for (const c of candidates) {
+    if (isNapcatDir(c)) return c;
+  }
+
+  // 4. 回退——返回第一个已知路径让部署器使用
+  return KNOWN_NAPCAT_PATHS[0];
 }
 
 function apiBase(cfg) { return `http://127.0.0.1:${cfg.apiPort}`; }
@@ -227,7 +340,7 @@ async function deployNapcat(napcatDir, version = "") {
   console.log(`[qq-deploy] ✅ 下载完成 (${mbSize} MB)`);
 
   // 4. 解压到临时目录
-  const tempExtract = join(require("os").tmpdir(), `napcat-extract-${Date.now()}`);
+  const tempExtract = join(tmpdir(), `napcat-extract-${Date.now()}`);
   mkdirSync(tempExtract, { recursive: true });
   console.log(`[qq-deploy] 正在解压...`);
   await execFile("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", 
@@ -331,32 +444,70 @@ function apply(ctx, config) {
   // ======== qq_status tool ========
   ctx.tools.register(defineTool({
     name: "qq_status",
-    description: `Check whether the local NapCat QQ bot is running and logged in (HTTP API 127.0.0.1:${cfg.apiPort}). Returns running state and the logged-in bot account.`,
+    description: `Check NapCat installation status and HTTP API connectivity. Reports three states: NOT_INSTALLED, NOT_RUNNING, LOGGED_IN. Also shows detected candidates if scan is available.`,
     parameters: {},
     output: {
       schema: {
         type: "object",
         additionalProperties: false,
         properties: {
+          state: { type: "string", required: true },
           running: { type: "boolean", required: true },
+          logged_in: { type: "boolean" },
           apiPort: { type: "integer" },
           botUserId: { type: "string" },
-          botNickname: { type: "string" }
+          botNickname: { type: "string" },
+          napcatDir: { type: "string" },
+          details: { type: "string" }
         }
       },
       render: (_args, value) => [{ type: "text", text: JSON.stringify(value) }]
     },
     async execute() {
+      // Check installation via known paths
+      let installed = false;
+      for (const p of KNOWN_NAPCAT_PATHS) {
+        if (isNapcatDir(p)) { cfg.napcatDir = cfg.napcatDir || p; break; }
+      }
+
       let login = null;
       try {
         const resp = await fetch(`${apiBase(cfg)}/get_login_info`, { signal: AbortSignal.timeout(5000) });
         if (resp.ok) { const data = await resp.json(); if (data.status === "ok") login = data.data; }
       } catch { /* not running */ }
+
+      // Determine state
+      let state;
+      if (login) state = "LOGGED_IN";
+      else if (installed) state = "NOT_RUNNING";
+      else state = "NOT_INSTALLED";
+
+      const lines = [];
+      if (!installed && !login) {
+        lines.push("目录: " + (cfg.napcatDir || "未配置"));
+        lines.push("node.exe: ❌");
+        lines.push("index.js: ❌");
+        lines.push("config.json: ❌");
+        lines.push("qq.ps1: ❌");
+        lines.push("HTTP API: 不可达 | Bot: 未安装");
+      } else if (login) {
+        lines.push("✅ NapCat 正在运行并已登录");
+        lines.push("Bot: " + String(login.user_id) + " (" + (login.nickname || "") + ")");
+        lines.push("API: http://127.0.0.1:" + cfg.apiPort);
+      } else {
+        lines.push("⚠️ NapCat 已安装但未启动");
+        lines.push("建议: 运行 qq_napcat action=start 启动");
+      }
+
       return {
+        state,
         running: login !== null,
+        logged_in: login !== null,
         apiPort: cfg.apiPort,
         ...(login ? { botUserId: String(login.user_id) } : {}),
-        ...(login ? { botNickname: login.nickname } : {})
+        ...(login ? { botNickname: login.nickname } : {}),
+        napcatDir: cfg.napcatDir || "",
+        details: lines.join("\n")
       };
     }
   }));
@@ -381,6 +532,112 @@ function apply(ctx, config) {
     async execute(args) {
       const output = await runQqPs(cfg.napcatDir, args.action);
       return { output };
+    }
+  }));
+
+  // ======== qq_detect tool — 检测指定目录是否为合法 NapCat ===
+  ctx.tools.register(defineTool({
+    name: "qq_detect",
+    description: `Detect whether a given directory contains a valid NapCat installation. Checks for node.exe, index.js, config.json, qq.ps1 and napcat subfolder. Returns detailed status and suggestions. Pass --help for setup guide.`,
+    parameters: {
+      dir: { type: "string", description: "Directory path to check. If omitted, checks current napcatDir setting." }
+    },
+    output: {
+      schema: { type: "object", additionalProperties: false, properties: { output: { type: "string", required: true } } },
+      render: (_a, v) => [{ type: "text", text: v.output }]
+    },
+    async execute(args) {
+      const dir = args.dir || cfg.napcatDir;
+      if (!dir) return { output: "[qq-detect] No directory specified. Use --dir <path> or set napcatDir in config first." };
+
+      const hasNodeExe = existsSync(join(dir, "node.exe"));
+      const hasIndexJs = existsSync(join(dir, "index.js"));
+      const hasConfigJson = existsSync(join(dir, "config.json"));
+      const hasQQps1 = existsSync(join(dir, "qq.ps1"));
+      const hasNapcatSub = existsSync(join(dir, "napcat")) && statSync(join(dir, "napcat")).isDirectory();
+      const isFull = isNapcatDir(dir);
+
+      let lines = [
+        `目录: ${dir}`,
+        `node.exe: ${hasNodeExe ? '✅' : '❌'}`,
+        `index.js: ${hasIndexJs ? '✅' : '❌'}`,
+        `config.json: ${hasConfigJson ? '✅' : '⚠️ (可选)'}`,
+        `qq.ps1: ${hasQQps1 ? '✅' : '❌'}`,
+        `napcat/子目录: ${hasNapcatSub ? '✅' : '❌'}`
+      ];
+
+      if (isFull) {
+        lines.push(`\n✅ 这是一个合法的 NapCat 部署`);
+      } else {
+        const missing = [];
+        if (!hasNodeExe) missing.push("node.exe");
+        if (!hasIndexJs) missing.push("index.js");
+        if (!hasQQps1) missing.push("qq.ps1");
+        if (missing.length > 0) {
+          lines.push(`\n❌ 缺少关键文件: ${missing.join(", ")}`);
+          lines.push("解决方案: 运行 qq_deploy 自动安装，或手动下载 NapCat Shell zip 解压至此目录");
+        }
+      }
+
+      return { output: lines.join("\n") };
+    }
+  }));
+
+  // ======== qq_find tool — 全机扫描 NapCat 实例 =================
+  ctx.tools.register(defineTool({
+    name: "qq_find",
+    description: `Auto-scan for all NapCat installations on this machine. Searches from configured napcatDir upward, also checks common locations. Returns all detected instances with paths and status.`,
+    parameters: {},
+    output: {
+      schema: { type: "object", additionalProperties: false, properties: { output: { type: "string", required: true } } },
+      render: (_a, v) => [{ type: "text", text: v.output }]
+    },
+    async execute() {
+      const rootDir = cfg.napcatDir ? dirname(dirname(cfg.napcatDir)) : "";
+      const scans = [
+        rootDir,                         // 当前配置相关目录
+        ...(process.env.HOME || process.env.USERPROFILE || ""),  // 用户主目录
+      ].filter(Boolean);
+
+      let allResults = [];
+      const seen = new Set();
+
+      for (const sd of scans) {
+        try {
+          const found = scanForNapcat(sd, 6);
+          for (const r of found) {
+            if (!seen.has(r.dir)) {
+              seen.add(r.dir);
+              allResults.push(r);
+            }
+          }
+        } catch (e) { /* skip unreadable dirs */ }
+      }
+
+      // 也检查已知路径
+      for (const kp of KNOWN_NAPCAT_PATHS) {
+        if (isNapcatDir(kp) && !seen.has(kp)) {
+          seen.add(kp);
+          allResults.push({ dir: kp, exact: true });
+        }
+      }
+
+      if (allResults.length === 0) {
+        return { output: `未找到。\n解决方案:\n• 运行 \`qq_deploy\` 自动安装\n• 安装后运行 \`qq_detect(<你的目录>)\` 验证` };
+      }
+
+      const lines = [`找到 ${allResults.length} 个 NapCat 实例:`];
+      for (let i = 0; i < allResults.length; i++) {
+        const r = allResults[i];
+        const apiPing = isNapcatDir(r.dir) ? '✅ 结构完整' : '⚠️ 结构不完整';
+        lines.push(`${i + 1}. ${r.dir}`);
+        lines.push(`   ${apiPing}`);
+      }
+
+      lines.push(`\n=== 建议 ===`);
+      lines.push(`将第一个结果设为默认: qq_config_set napcatDir "${allResults[0].dir}"`);
+
+      return { output: lines.join("\n") };
     }
   }));
 
