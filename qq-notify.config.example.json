@@ -1,8 +1,4 @@
 {
-  "_说明": "QQ 通知插件 (dsh-qq-notify) 配置模板。复制为 qq-notify.config.json 后编辑，重启 DSH 生效。",
   "mainQq": "940841288",
-  "apiPort": 3002,
-  "napcatDir": "D:\\Project\\qq-remote-deploy\\napcat",
-  "botQq": "",
-  "webPanelEnabled": true
+  "_说明": "复制为 qq-notify.config.json 后编辑。也可以直接在 DSH 里说「QQ主号改成 xxx」自动修改。"
 }

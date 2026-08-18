@@ -1,46 +1,33 @@
 # dsh-qq-notify
 
-Send QQ private-message notifications to your main account via a local NapCat bot. Four native DSH tools + a **web console** mounted on the DSH web server (no extra port).
+Send QQ private-message notifications to your main account via a local NapCat bot. Six native DSH tools + a **standalone HTML console**.
 
 ## Usage
 
-### ① Web console
+### ① Standalone web console (zero dependencies)
 
-Append `/qq-panel` to the DSH web URL (e.g. `http://127.0.0.1:52364/qq-panel`):
+Open `qq-panel.html` in your browser — no server, no extra port:
 
 - Channel status (NapCat online/offline, bot account)
 - Message box → "Send"
 - NapCat start / stop / restart buttons
 
-### ② Just talk to the model (tools are auto-loaded)
+### ② Just talk to the model (6 tools auto-loaded)
 
-| You say | Tool | Effect |
-|---|---|---|
-| "send QQ: task done" | qq_send | Send to main account |
-| "check QQ channel status" | qq_status | NapCat online? bot account? |
-| "start/restart QQ notify" | qq_napcat | Manage NapCat |
-| "set up QQ notify for me" | qq_deploy | Auto-download & deploy NapCat |
+| You say | Effect |
+|---|---|
+| "send QQ: task done" | Send to main account |
+| "show current QQ config" | Display all configuration |
+| "change my main QQ to xxx" | Update and save config |
+| "check QQ channel status" | Is NapCat online? |
+| "start/restart QQ notify" | Manage NapCat |
+| "set up QQ notify for me" | Auto-download & deploy NapCat |
 
 ### ③ Command line (no plugin needed)
 
 ```bat
-qq send "msg"    qq status    qq start / stop / restart / logs
+qq send "msg"    qq status    qq start / stop / restart / logs    qq autostart on
 ```
-
-## Config
-
-Edit `qq-notify.config.json` next to the deployment (effective after DSH restart):
-
-```json
-{
-  "mainQq": "940841288",
-  "apiPort": 3002,
-  "napcatDir": "D:\\...\\napcat",
-  "webPanelEnabled": true
-}
-```
-
-> The plugin itself needs no port (tools call NapCat in-process; the web console is mounted at `/qq-panel` on the DSH web server).
 
 ## Install
 
@@ -48,4 +35,4 @@ Edit `qq-notify.config.json` next to the deployment (effective after DSH restart
 dsh plugin --profile web add file:<this-dir>
 ```
 
-Restart DSH. Requires Windows 10/11 x64, a deployed NapCat (qq_deploy can install it), a logged-in bot account whose friend list includes your main account.
+Restart DSH. A fresh machine needs QQ installed first (provides encryption DLLs), then say "set up QQ notify for me" to walk through everything end-to-end.

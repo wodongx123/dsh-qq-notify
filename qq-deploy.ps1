@@ -1,4 +1,4 @@
-﻿# qq-deploy.ps1 —— NapCat 自动部署引导（供插件 qq_deploy 工具调用，也可手动运行）
+# qq-deploy.ps1 —— NapCat 自动部署引导（供插件 qq_deploy 工具调用，也可手动运行）
 # 功能:
 #   1. 检测 napcatDir 是否已有可运行的 NapCat
 #   2. 无则从 GitHub Releases 下载 NapCat.Shell.Windows.Node.zip 并解压
@@ -88,5 +88,16 @@ if ((Test-Path $wrapper) -and -not (Test-Path (Join-Path $Dir "crypto.dll"))) {
 
 # ---------- 4. 完成 ----------
 Write-Step "部署完成: $Dir"
-Write-Step "下一步: 运行 qq start 后，用【机器人小号】手机 QQ 扫码登录（WebUI: http://127.0.0.1:6099/webui 或查看 napcat\cache\qrcode.png）。"
-Write-Step "登录一次后，以后启动自动快速登录（qq start / qq autostart on）。"
+if (-not (Test-Path (Join-Path $Dir "crypto.dll"))) {
+  Write-Step ""
+  Write-Step "⚠️ 未检测到已安装的 QQ/腾讯系客户端，跳过 crypto.dll/ssl.dll 修复。"
+  Write-Step "如启动时报 'crypto.dll 缺失' 或 'ssl.dll 缺失'，请先安装一个 QQ（或微信），再运行一次本脚本。"
+} else {
+  Write-Step "已预置加密模块。"
+}
+Write-Step ""
+Write-Step "=== 下一步 ==="
+Write-Step "1. 运行 `qq start` 启动 NapCat"
+Write-Step "2. 用【机器人小号】手机 QQ 扫描登录（WebUI: http://127.0.0.1:6099/webui，或查看 napcat\\cache\\qrcode.png）"
+Write-Step "3. 登录一次后以后自动快速登录（也可 `qq autostart on` 开机自启）"
+Write-Step "4. 登录成功后说「我的QQ主号改成 xxx」保存配置，然后就能发了！"
