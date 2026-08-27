@@ -4,6 +4,16 @@
   "description": "QQ notifications via local NapCat: qq_send / qq_status / qq_napcat tools. 中文: 通过本机 NapCat 向主号 QQ 发送通知，附状态查询与 NapCat 管理工具。",
   "type": "module",
   "main": "lib/index.js",
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wodongx123/dsh-qq-notify.git"
+  },
+  "bugs": {
+    "url": "https://github.com/wodongx123/dsh-qq-notify/issues"
+  },
   "exports": {
     ".": "./lib/index.js",
     "./client": "./client.js",
