@@ -11,7 +11,7 @@ window.__ModuleLoader__.load({
     const en = {
       nav: 'QQ Notification',
       title: 'QQ Notification',
-      intro: 'Send notifications to your QQ via the local NapCat bot. Configure the main QQ number, API port, and NapCat directory below.',
+      intro: 'Send notifications to your QQ via the local NapCat bot. First download and install NapCat, then configure the directory below.',
       statusFailed: 'Could not read the QQ notification status.',
       saveFailed: 'Could not save configuration.',
       mainQq: 'Main QQ',
@@ -32,30 +32,33 @@ window.__ModuleLoader__.load({
       testFailed: 'Could not send test notification.',
       startNapcat: 'Start NapCat',
       stopNapcat: 'Stop NapCat',
-      restartNapcat: 'Restart NapCat',
       actionBusy: 'Working…',
+      startingWait: 'Starting… (refreshing in 6s)',
       configSaved: 'Configuration saved.',
-      deploy: 'Deploy NapCat',
-      deployDesc: 'Automatically download and install NapCat in a local directory.',
       save: 'Save',
+      webui: 'Open WebUI',
+      webuiDesc: 'Manage NapCat settings and scan QR code:',
       scanNapcat: 'Scan for NapCat',
       scanning: 'Scanning…',
       foundInstances: 'Found instances',
       useThis: 'Use this',
-      noInstances: 'No NapCat instances found. Use the agent tool "qq_deploy" to install.',
+      noInstances: 'No NapCat instances found.',
       setInstance: 'Select an instance to set as NapCat directory',
-      tipTitle: '💡 NapCat installation guide',
-      tipLine1: 'Tell the agent in the conversation:',
-      tipCmd: '"帮我装好QQ通知"',
-      tipLine2: 'It will automatically download, extract, fix bugs, and guide you through QR-code login.',
-      tipMore: 'See README for all available commands.',
-      tipMoreLink: 'https://github.com/wodongx123/dsh-qq-notify/blob/main/dsh-qq-notify/README.md'
+      // Guide card
+      guideTitle: '📥 NapCat Installation Guide',
+      guideLink: 'https://napneko.github.io/guide/boot/Shell',
+      guideDesc: 'Follow the official NapCat Shell boot guide:',
+      guideStep1: '1. Download NapCat Shell from GitHub Releases',
+      guideStep2: '2. Download and install QQNT from im.qq.com',
+      guideStep3: '3. Extract NapCat to any directory',
+      guideStep4: '4. Fill in the NapCat directory path in the config card above',
+      guideStep5: '5. Click "Start NapCat" and scan the QR code with your phone QQ',
     }
 
     const zh = {
       nav: 'QQ 通知',
       title: 'QQ 通知',
-      intro: '通过本机 NapCat 机器人向你的 QQ 发送通知。以下配置主号 QQ、API 端口和 NapCat 部署目录。',
+      intro: '通过本机 NapCat 机器人向你的 QQ 发送通知。请先下载安装 NapCat，然后在下方配置目录。',
       statusFailed: '无法读取 QQ 通知状态。',
       saveFailed: '无法保存配置。',
       mainQq: '主号 QQ',
@@ -76,24 +79,27 @@ window.__ModuleLoader__.load({
       testFailed: '无法发送测试通知。',
       startNapcat: '启动 NapCat',
       stopNapcat: '停止 NapCat',
-      restartNapcat: '重启 NapCat',
       actionBusy: '处理中…',
+      startingWait: '正在启动…（6秒后刷新）',
       configSaved: '配置已保存。',
-      deploy: '部署 NapCat',
-      deployDesc: '自动下载安装 NapCat 到本地目录。',
       save: '保存',
+      webui: '打开 WebUI',
+      webuiDesc: '管理 NapCat 设置和扫码登录：',
       scanNapcat: '扫描 NapCat',
       scanning: '扫描中…',
       foundInstances: '找到的实例',
       useThis: '使用此目录',
-      noInstances: '未找到任何 NapCat 实例。请使用 agent 工具 "qq_deploy" 安装。',
+      noInstances: '未找到任何 NapCat 实例。',
       setInstance: '选择一个实例设为 NapCat 目录',
-      tipTitle: '💡 NapCat 安装指引',
-      tipCmd: '「帮我装好QQ通知」',
-      tipLine1: '在对话中对 Agent 说：',
-      tipLine2: '即可自动下载解压、修复 bug、引导扫码登录。',
-      tipMore: '更多指令见 README。',
-      tipMoreLink: 'https://github.com/wodongx123/dsh-qq-notify/blob/main/dsh-qq-notify/README.md'
+      // Guide card
+      guideTitle: '📥 NapCat 安装指引',
+      guideLink: 'https://napneko.github.io/guide/boot/Shell',
+      guideDesc: '参考 NapCat 官方 Shell 引导文档：',
+      guideStep1: '1. 从 GitHub Releases 下载 NapCat Shell 版',
+      guideStep2: '2. 从 im.qq.com 下载并安装 QQNT',
+      guideStep3: '3. 解压 NapCat 到任意目录',
+      guideStep4: '4. 在上方配置卡片中填入 NapCat 目录路径',
+      guideStep5: '5. 点击「启动 NapCat」并用手机 QQ 扫码登录',
     }
 
     const css = `
@@ -165,6 +171,7 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = React.useState()
       const [config, setConfig] = React.useState({ mainQq: '', apiPort: 3002, napcatDir: '', botQq: '' })
       const [instances, setInstances] = React.useState()
+      const [showGuide, setShowGuide] = React.useState(false)
 
       const fetchStatus = React.useCallback(async () => {
         setError(undefined)
@@ -215,7 +222,22 @@ window.__ModuleLoader__.load({
           if (!res.ok) throw new Error(`HTTP ${res.status}`)
           const data = await res.json()
           setSuccess(data.message ?? `${action} done`)
-          await fetchStatus()
+          if (action === 'start' || action === 'restart') {
+            // 启动后轮询状态，最多等 20 秒让 NapCat 跑起来
+            setBusy('start-wait')
+            for (let i = 0; i < 20; i++) {
+              await new Promise((r) => setTimeout(r, 1000))
+              const res = await fetch('/dsh-qq-notify/status')
+              if (res.ok) {
+                const d = await res.json()
+                setStatus(d)
+                setConfig(d.config ?? {})
+                if (d.napcatStatus === 'running') break
+              }
+            }
+          } else {
+            await fetchStatus()
+          }
         } catch (fail) {
           setError(fail instanceof Error ? fail.message : String(fail))
         } finally {
@@ -269,6 +291,25 @@ window.__ModuleLoader__.load({
         React.createElement('h2', { className: 'qqNotifyTitle' }, t('title')),
         React.createElement('p', { className: 'qqNotifyIntro' }, t('intro')),
 
+        // ---- Guide card (collapsible) ----
+        React.createElement('div', { className: 'qqNotifyCard qqNotifyTipCard' },
+          React.createElement('div', { style: { padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '4px' } },
+            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }, onClick: () => setShowGuide(!showGuide) },
+              React.createElement('span', { style: { fontSize: '13px', lineHeight: '24px', color: 'var(--dsw-alias-label-tertiary)', transition: 'transform 0.2s', transform: showGuide ? 'rotate(90deg)' : 'rotate(0deg)' } }, '▶'),
+              React.createElement('span', { style: { fontSize: '15px', fontWeight: '600', lineHeight: '24px' } }, t('guideTitle'))
+            ),
+            showGuide ? React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' } },
+              React.createElement('p', { style: { margin: '4px 0 0', fontSize: '13px', lineHeight: '20px', color: 'var(--dsw-alias-label-secondary)' } }, t('guideDesc')),
+              React.createElement('a', { href: t('guideLink'), target: '_blank', rel: 'noopener noreferrer', style: { fontSize: '13px', lineHeight: '20px', color: 'var(--dsw-alias-state-info-primary,#4dabf7)', textDecoration: 'underline', display: 'block', marginBottom: '4px' } }, t('guideLink')),
+              React.createElement('p', { style: { margin: '2px 0', fontSize: '13px', lineHeight: '20px', color: 'var(--dsw-alias-label-secondary)' } }, t('guideStep1')),
+              React.createElement('p', { style: { margin: '2px 0', fontSize: '13px', lineHeight: '20px', color: 'var(--dsw-alias-label-secondary)' } }, t('guideStep2')),
+              React.createElement('p', { style: { margin: '2px 0', fontSize: '13px', lineHeight: '20px', color: 'var(--dsw-alias-label-secondary)' } }, t('guideStep3')),
+              React.createElement('p', { style: { margin: '2px 0', fontSize: '13px', lineHeight: '20px', color: 'var(--dsw-alias-label-secondary)' } }, t('guideStep4')),
+              React.createElement('p', { style: { margin: '2px 0 0', fontSize: '13px', lineHeight: '20px', color: 'var(--dsw-alias-label-secondary)' } }, t('guideStep5')),
+            ) : null
+          )
+        ),
+
         // ---- Status card ----
         React.createElement('div', { className: 'qqNotifyCard' },
           React.createElement('div', { className: 'qqNotifyRow' },
@@ -281,16 +322,14 @@ window.__ModuleLoader__.load({
           ),
           status && status.napcatStatus === 'running'
             ? React.createElement('div', { className: 'qqNotifyActions' },
-                React.createElement('button', { type: 'button', className: 'qqNotifyButton', disabled: busy === 'restart', onClick: () => napcatAction('restart') },
-                  busy === 'restart' ? t('actionBusy') : t('restartNapcat')
-                ),
+                React.createElement('a', { href: 'http://127.0.0.1:6099/webui', target: '_blank', rel: 'noopener noreferrer', className: 'qqNotifyButton qqNotifyPrimary', style: { textDecoration: 'none' } }, t('webui')),
                 React.createElement('button', { type: 'button', className: 'qqNotifyButton', disabled: busy === 'stop', onClick: () => napcatAction('stop') },
                   busy === 'stop' ? t('actionBusy') : t('stopNapcat')
                 )
               )
             : React.createElement('div', { className: 'qqNotifyActions' },
-                React.createElement('button', { type: 'button', className: 'qqNotifyButton qqNotifyPrimary', disabled: busy === 'start', onClick: () => napcatAction('start') },
-                  busy === 'start' ? t('actionBusy') : t('startNapcat')
+                React.createElement('button', { type: 'button', className: 'qqNotifyButton qqNotifyPrimary', disabled: busy === 'start' || busy === 'start-wait', onClick: () => napcatAction('start') },
+                  busy === 'start-wait' ? t('startingWait') : (busy === 'start' ? t('actionBusy') : t('startNapcat'))
                 )
               ),
           React.createElement('div', { className: 'qqNotifyActions' },
@@ -320,7 +359,7 @@ window.__ModuleLoader__.load({
             title: t('mainQq'),
             description: t('mainQqDesc'),
             value: config.mainQq,
-            placeholder: '940841288',
+            placeholder: '',
             onChange: (v) => setConfig((c) => ({ ...c, mainQq: v }))
           }),
           React.createElement(ConfigRow, {
@@ -350,19 +389,6 @@ window.__ModuleLoader__.load({
             ),
             React.createElement('button', { type: 'button', className: 'qqNotifyButton', disabled: busy === 'test', onClick: testSend },
               busy === 'test' ? t('actionBusy') : t('testSend')
-            )
-          )
-        ),
-
-        // ---- Tip card ----
-        React.createElement('div', { className: 'qqNotifyCard qqNotifyTipCard' },
-          React.createElement('div', { style: { padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '4px' } },
-            React.createElement('span', { style: { fontSize: '13px', fontWeight: '600', lineHeight: '20px' } }, t('tipTitle')),
-            React.createElement('p', { style: { margin: '4px 0 0', fontSize: '13px', lineHeight: '20px', color: 'var(--dsw-alias-label-secondary)' } },
-              t('tipLine1'), ' ', React.createElement('code', { style: { fontFamily: 'monospace', fontSize: '13px', background: 'var(--dsw-alias-bg-layer-2)', padding: '1px 6px', borderRadius: '4px', border: '1px solid var(--dsw-alias-border-l2)' } }, t('tipCmd')), ' ', t('tipLine2')
-            ),
-            React.createElement('p', { style: { margin: '2px 0 0', fontSize: '12px', lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary)' } },
-              React.createElement('a', { href: t('tipMoreLink'), target: '_blank', rel: 'noopener noreferrer', style: { color: 'var(--dsw-alias-state-info-primary,#4dabf7)', textDecoration: 'underline' } }, t('tipMore'))
             )
           )
         ),
