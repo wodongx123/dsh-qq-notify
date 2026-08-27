@@ -42,7 +42,7 @@ dsh plugin --profile web add file:<本目录>
 
 | 键 | 默认值 | 说明 |
 |---|---|---|
-| `mainQq` | `940841288` | 接收通知的主号 QQ |
+| `mainQq` | 空 | 接收通知的主号 QQ（用 `qq_config_set mainQq` 设置） |
 | `apiPort` | `3002` | NapCat HTTP API 端口 |
 | `napcatDir` | 自动发现 | NapCat 部署目录（也可用 `qq_find` 自动定位） |
 | `botQq` | 空 | 机器人小号 QQ（可选） |
