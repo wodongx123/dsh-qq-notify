@@ -1,0 +1,27 @@
+# ===== NapCat 部署（含 node.exe / wrapper.node / DLL 等大二进制，不入库）=====
+NapCat.Shell/
+napcat/
+
+# ===== 运行时生成物 =====
+*.log
+.napcat.pid
+.napcat-launch-*.vbs
+loadNapCat.js
+run-stdout.log
+run-stderr.log
+
+# ===== 个人配置（含主号 QQ）=====
+qq-notify.config.json
+.github-token
+
+# ===== 凭据（绝不可入库）=====
+*.pem
+*.key
+
+# ===== 系统 =====
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# ===== dsh-qq-notify 插件本地安装产物 =====
+dsh-qq-notify/node_modules/
