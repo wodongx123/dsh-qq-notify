@@ -48,3 +48,12 @@ dsh plugin --profile web add file:<本目录>
 | `botQq` | 空 | 机器人小号 QQ（可选） |
 
 配置文件持久化在 `<插件根目录>/napcat/qq-notify.config.json`。
+
+## 故障排查
+
+| 现象 | 处理 |
+|---|---|
+| `qq_status` 显示未运行 | 先 `qq_napcat action=start`，再用手机 QQ 扫码登录 WebUI（http://127.0.0.1:6099/webui） |
+| `qq_send` 报 API unreachable | 确认 NapCat 已启动且 `apiPort`（默认 3002）未被占用 |
+| 发送成功但收不到 | 检查主号是否已配置（`qq_config_set mainQq`），并确认机器人与主号互为好友 |
+| 找不到 NapCat | 用 `qq_find` 自动扫描，或 `qq_config_set napcatDir` 手动指定目录 |
